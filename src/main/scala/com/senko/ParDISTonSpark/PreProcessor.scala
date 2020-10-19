@@ -29,20 +29,69 @@ class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext,
       Await.result(elem, Duration.Inf)
     })
 
-    // transit networkten gelen bilgieri birlestirmen lazim.
-    var transitNetworkVertıces = new ListBuffer[VertexId]()
+    // combine all partial transit network info from partitions.
+    var transitNetworkVertices = new ListBuffer[VertexId]()
     var transitNetworkEdges = new ListBuffer[Edge[Int]]()
     for(partition <- result) {
       val aa: ListBuffer[VertexId] = partition._3
-      transitNetworkVertıces = transitNetworkVertıces ++ aa
+      transitNetworkVertices = transitNetworkVertices ++ aa
       val bb: ListBuffer[Edge[Int]] = partition._4
       transitNetworkEdges = transitNetworkEdges ++ bb
     }
 
-    println(transitNetworkVertıces.distinct)
-    println(transitNetworkEdges.distinct)
+    //transitNetworkVertices = transitNetworkVertices.distinct
+    var newtransitNetworkVertices = new ListBuffer[(VertexId, VertexId)]
+    newtransitNetworkVertices = transitNetworkVertices.distinct.map(elem => (elem, elem))
+    transitNetworkEdges = transitNetworkEdges.distinct
 
+    val transitNetworkVerticesRDD = sc.parallelize(newtransitNetworkVertices)
+    val transitNetworkEdgesRDD = sc.parallelize(transitNetworkEdges)
 
+    val transitNetworkGraph = Graph(transitNetworkVerticesRDD, transitNetworkEdgesRDD)
+    val extendedComponentArray = result.map(result => (result._1, result._2))
+
+    // return all extended component subgraphs and transit network graph
+    (extendedComponentArray, transitNetworkGraph)
+
+  }
+
+  def prepareComponentDistanceMatrix() = {
+    val partitions = GraphHelpers.getPartitions(graph)
+    val CDM = new ListBuffer[(String, String, ListBuffer[(VertexId, VertexId, Int)])]
+    val vertexList = new ListBuffer[(String, List[VertexId])]
+
+    for(partition <- partitions) {
+      val vertices = graph.vertices.filter(vertex => vertex._2.partition == partition && vertex._2.isBorderNode == true).collect()
+      vertexList.append((partition, vertices.map(vertex => vertex._1).toList))
+    }
+
+    // loop for inside a partition for each partition
+    for(sourceVertexGroup <- vertexList) {
+      for(destVertexGroup <- vertexList) {
+        log.info(s"CDM calculating for source partition: ${sourceVertexGroup._1} destination partition: ${destVertexGroup._1}")
+        if (sourceVertexGroup._1 != destVertexGroup._1) {
+
+          val tempVertexList = new ListBuffer[(VertexId, VertexId, Int)]
+
+          // for vertexID in partition to each vertexID in other partition
+          for(sourceVertex <- sourceVertexGroup._2) {
+            for(destVertex <- destVertexGroup._2) {
+              log.debug(s"shortest path is calculating for, source: ${sourceVertex} destination: ${destVertex}")
+              log.info(s"shortest path is calculating for, source: ${sourceVertex} destination: ${destVertex}")
+              val result = ShortestPath.singleSourceSingleTargetDijkstra(graph, sourceVertex, destVertex)
+              log.debug(s"shortest path calculation completed for, source: ${sourceVertex} destination: ${destVertex}")
+              log.info(s"shortest path calculation completed for, source: ${sourceVertex} destination: ${destVertex}")
+              tempVertexList.append((sourceVertex, destVertex, result._2))
+            }
+          }
+
+          CDM.append((sourceVertexGroup._1, destVertexGroup._1, tempVertexList))
+
+        }
+      }
+    }
+    // return component distance matrix
+    CDM
 
   }
 
