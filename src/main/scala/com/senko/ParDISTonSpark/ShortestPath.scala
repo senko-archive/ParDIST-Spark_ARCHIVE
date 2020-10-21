@@ -40,14 +40,6 @@ object ShortestPath {
     val result = g2.vertices.filter(item => item._1 == destination).map(item => (item._1, item._2._2, item._2._3)).collect().head
     result
 
-    //    g2.vertices.collect().foreach(println(_))
-    //
-    //    g.outerJoinVertices(g2.vertices)((vid, vd, dist) =>
-    //      (vd, dist.getOrElse((false, Int.MaxValue, List[VertexId]()))
-    //        .productIterator.toList.tail))
-
-
-
   }
 
 }

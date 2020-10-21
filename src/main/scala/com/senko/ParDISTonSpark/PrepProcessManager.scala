@@ -10,7 +10,7 @@ object PrepProcessManager {
   val log = LogManager.getLogger(PrepProcessManager.getClass)
 
   def start(g: Graph[Node, Int], sc: SparkContext) = {
-    val pre = PreProcessor(g, 1, sc)
+    val pre = PreProcessor(g, 4, sc) // default 4 parallel partition work at same time
     val (extendedComponentArray, transitNetwork) = pre.prepareExtendedComponents()
     val CDM: ListBuffer[(String, String, ListBuffer[(VertexId, VertexId, Int)])] = pre.prepareComponentDistanceMatrix()
 
@@ -26,6 +26,12 @@ object PrepProcessManager {
       ex._2.vertices.collect().foreach(println(_))
       println("----------")
     }
+
+    // make CDM spark RDD
+    val cdmRDD = sc.parallelize(CDM)
+
+    // return list of extendedComponents, tranistNetwork and CDM
+    (extendedComponentArray, transitNetwork, cdmRDD)
 
   }
 
