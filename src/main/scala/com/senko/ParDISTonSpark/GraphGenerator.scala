@@ -87,10 +87,32 @@ object GraphGenerator {
 
   }
 
+  def createDirectedSampleGraph = {
+    val vertexA = (1L, Node("A", false, "C1", None))
+    val vertexB = (2L, Node("B", true, "C1", None))
+    val vertexC = (3L, Node("C", true, "C1", None))
+    val vertexD = (4L, Node("D", true, "C2", None))
+    val vertexE = (5L, Node("E", false, "C2", None))
+
+    val seqOfVertices = Seq(vertexA, vertexB, vertexC, vertexD, vertexE)
+
+    val seqOfEdges = Seq(
+      Edge(vertexA._1, vertexB._1, 2),
+      Edge(vertexB._1, vertexC._1, 10), Edge(vertexC._1, vertexB._1, 8),
+      Edge(vertexB._1, vertexD._1, 3),
+      Edge(vertexC._1, vertexD._1, 2),
+      Edge(vertexD._1, vertexE._1, 4),
+      Edge(vertexD._1, vertexB._1, 1)
+    )
+
+    (seqOfVertices, seqOfEdges)
+  }
+
   def createGraph(sc: SparkContext) = {
     log.info("Creating Graph... for ParDIST paper example")
 
     val (vertices, edges) = createParDistExampleGraph
+    //val (vertices, edges) = createDirectedSampleGraph
 
     log.info("vertices and edges parallelizing")
     val verticesRDD = sc.parallelize(vertices)
