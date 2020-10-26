@@ -36,7 +36,7 @@ object Main extends App {
   //queryProcessor.queryDistance(16L, 21L)
   queryProcessor.queryDistance(1L, 13L)
 
-
+  //queryProcessor.queryDistance(5L, 1L)
 
 
 
