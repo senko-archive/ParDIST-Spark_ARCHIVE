@@ -27,7 +27,7 @@ object GraphHelpers {
         }
       }
     }
-
+/*
     for(elem <- borderListBuffer) {
       for(i <- 0 to borderList.length -1) {
         if(elem._1._1 == borderListBuffer(i)._2._1 && elem._2._1 == borderListBuffer(i)._1._1) {
@@ -35,7 +35,7 @@ object GraphHelpers {
         }
       }
     }
-
+*/
     borderListBuffer.filter(item => item._1 != item._2)
   }
 
