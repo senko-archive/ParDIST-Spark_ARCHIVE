@@ -1,11 +1,10 @@
 package com.senko.ParDISTonSpark
 
-import java.io
 import java.util.concurrent.Executors
 
 import org.apache.log4j.LogManager
 import org.apache.spark.SparkContext
-import org.apache.spark.graphx.{Edge, EdgeTriplet, Graph, VertexId, VertexRDD}
+import org.apache.spark.graphx.{Edge, EdgeTriplet, Graph, VertexId}
 import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable.ListBuffer
@@ -14,7 +13,7 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 
 class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext, sc: SparkContext) {
   val log = LogManager.getLogger(this.getClass)
-  implicit val ec_inner = ec
+  implicit val ec_inner: ExecutionContext = ec
   val parallelWorkerNumber = parallel
   val scinner: SparkContext = sc
 
@@ -76,11 +75,11 @@ class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext,
           // for vertexID in partition to each vertexID in other partition
           for(sourceVertex <- sourceVertexGroup._2) {
             for(destVertex <- destVertexGroup._2) {
-              log.debug(s"shortest path is calculating for, source: ${sourceVertex} destination: ${destVertex}")
-              log.info(s"shortest path is calculating for, source: ${sourceVertex} destination: ${destVertex}")
+              log.debug(s"shortest path is calculating for, source: $sourceVertex destination: $destVertex")
+              log.info(s"shortest path is calculating for, source: $sourceVertex destination: $destVertex")
               val result = ShortestPath.singleSourceSingleTargetDijkstra(graph, sourceVertex, destVertex)
-              log.debug(s"shortest path calculation completed for, source: ${sourceVertex} destination: ${destVertex}")
-              log.info(s"shortest path calculation completed for, source: ${sourceVertex} destination: ${destVertex}")
+              log.debug(s"shortest path calculation completed for, source: $sourceVertex destination: $destVertex")
+              log.info(s"shortest path calculation completed for, source: $sourceVertex destination: $destVertex")
               tempVertexList.append((sourceVertex, destVertex, result._2))
             }
           }
@@ -97,7 +96,7 @@ class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext,
 
   def startCreateEC(partitionName: String) = Future {
 
-    log.info(s"thread started for partition: ${partitionName} with thread: ${Thread.currentThread().getName}")
+    log.info(s"thread started for partition: $partitionName with thread: ${Thread.currentThread().getName}")
 
     // get border and non-border nodes for partition
     val partitionNodes = GraphHelpers.getPartitionNodes(graph, partitionName)
@@ -105,12 +104,12 @@ class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext,
     val nonBorderNodes: Array[(VertexId, String)] = partitionNodes.filter(vertex => !vertex._2.isBorderNode).map(vertex => (vertex._1, vertex._2.name)).collect()
 
     // 2. idt icin source: border node, dest: other all non-border nodes
-    log.info(s"IDT is calculating for partition ${partitionName}")
+    log.info(s"IDT is calculating for partition $partitionName")
     val IDT_map: Map[VertexId, IDT] = computeIDT(borderNodes, nonBorderNodes)
 
 
     // 3. border node to border node shortest pathleri bul
-    log.info(s"border to border shortest path are running... for partition: ${partitionName}")
+    log.info(s"border to border shortest path are running... for partition: $partitionName")
     val borderCoupleList = GraphHelpers.generateBorderCouples(borderNodes)
     val borderToBorderShortest: ListBuffer[(VertexId, String, VertexId, String, List[VertexId])] = borderCoupleList.map(item => {
       // sourceId, sourceName, targetId, targetName,
@@ -120,11 +119,11 @@ class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext,
 
     // getPartitionGraph returns partitions node and vertices as graph
     // for extended component you need to add vertices and edges from border to border shortest paths
-    log.info(s"extended graph is extracting from original graph for partition: ${partitionName}")
+    log.info(s"extended graph is extracting from original graph for partition: $partitionName")
     val extendedSubGraph = GraphHelpers.getPartitionGraph(graph, partitionName)
 
     // burda extendedSubGraph ile IDT joinle
-    log.info(s"IDT data joining with extended graph for partition: ${partitionName}")
+    log.info(s"IDT data joining with extended graph for partition: $partitionName")
     val IDT_RDD: RDD[(VertexId, IDT)] = sc.parallelize(IDT_map.toList)
     val ecWithIDT = extendedSubGraph.joinVertices[IDT](IDT_RDD)((VertexID, VD, U) => {
       Node(VD.name, VD.isBorderNode, VD.partition, Some(U))
@@ -142,7 +141,7 @@ class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext,
     val unionedVertices = ecWithIDT.vertices.union(verticesToAddRDD)
     val unionedEdges = ecWithIDT.edges.union(edgesToAddRDD).distinct()
 
-    log.info(s"updated extended graph is creating... for partition: ${partitionName}")
+    log.info(s"updated extended graph is creating... for partition: $partitionName")
     val newExtendedComponent = Graph(unionedVertices, unionedEdges)
 
 //    log.info(s"for test for partition: ${partitionName}")
@@ -161,17 +160,19 @@ class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext,
     val IDT_mid_result = borderNodes.flatMap(borderNode => {
       nonBorderNodes.map(nonBorderNode => {
         log.debug(s"shortestpath is running for source: ${borderNode._1} and destination: ${nonBorderNode._1}")
-        val shortestPathResult = ShortestPath.singleSourceSingleTargetDijkstra(graph, borderNode._1, nonBorderNode._1)
+        val distanceBorderToNonBorder = ShortestPath.singleSourceSingleTargetDijkstra(graph, borderNode._1, nonBorderNode._1)._2
+        log.debug(s"shortestpath is running for source: ${nonBorderNode._1} and destination: ${borderNode._1}")
+        val distanceNonBorderToBorder = ShortestPath.singleSourceSingleTargetDijkstra(graph, nonBorderNode._1, borderNode._1)._2
         // tuple is source_id, source_name, destination_id, destinatoin_name, path_cost
-        val result = (borderNode._1, borderNode._2, nonBorderNode._1, nonBorderNode._2, shortestPathResult._2)
+        val result = (borderNode._1, borderNode._2, nonBorderNode._1, nonBorderNode._2, distanceNonBorderToBorder, distanceBorderToNonBorder)
         result
       })
     })
 
     // below code returns map of tuples (nonBorderNode_ID, IDT)
-    val IDT_result: Map[VertexId, IDT] = IDT_mid_result.groupBy(_._3).map(elem => {
-      var result: Array[(VertexId, String, Int)] = elem._2.map(inside => (inside._1, inside._2, inside._5))
-      var lb = new ListBuffer[(VertexId, String, Int)]()
+    val IDT_result: Map[VertexId, IDT] = IDT_mid_result.groupBy(_._3).map(f = elem => {
+      var result: Array[(VertexId, String, Map[String, Int])] = elem._2.map(inside => (inside._1, inside._2, Map("in" -> inside._6, "out" -> inside._5)))
+      var lb = new ListBuffer[(VertexId, String, Map[String, Int])]()
       result.foreach(item => {
         val toInsert = (item._1, item._2, item._3)
         lb.append(toInsert)

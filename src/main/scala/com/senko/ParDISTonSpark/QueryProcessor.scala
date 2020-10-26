@@ -84,7 +84,7 @@ class QueryProcessor(extendedNetworkList: Array[(String, Graph[Node, Int])],
     val distanceList = CDM_Map.flatMap{
       case(key, value1, value2) =>
         sourceIDT_BC.value.filter(item => item._2 == key).map{bcValues =>
-          (bcValues._1, key, value1, bcValues._3 + value2)
+          (bcValues._1, key, value1, bcValues._3("out") + value2)
         }
     }
 
@@ -118,7 +118,7 @@ class QueryProcessor(extendedNetworkList: Array[(String, Graph[Node, Int])],
     val distanceList = CDM_Map.flatMap{
       case(key, value1, value2) =>
         targetIDT_BC.value.filter(item => item._2 == key).map{bcValues =>
-          (bcValues._1, key, value1, bcValues._3 + value2)
+          (bcValues._1, key, value1, bcValues._3("in") + value2)
         }
     }
 
@@ -154,14 +154,14 @@ class QueryProcessor(extendedNetworkList: Array[(String, Graph[Node, Int])],
     val distanceListTemp = CDM_Map.flatMap{
       case(key, value1, value2) =>
         sourceIDT_BC.value.filter(item => item._2 == key).map{bcValues =>
-          (bcValues._1, key, value1, bcValues._3 + value2)
+          (bcValues._1, key, value1, bcValues._3("out") + value2)
         }
     }
 
     val distanceList = distanceListTemp.flatMap{
       case (source, sourceBorder, key, distance) =>
         targetIDT_BC.value.filter(item => item._2 == key).map{bcValues =>
-          (source, sourceBorder, key, bcValues._1, distance + bcValues._3)
+          (source, sourceBorder, key, bcValues._1, distance + bcValues._3("in"))
         }
     }
 
@@ -429,14 +429,14 @@ class QueryProcessor(extendedNetworkList: Array[(String, Graph[Node, Int])],
     val distanceListTemp = CDM_Map.flatMap{
       case(key, value1, value2) =>
         sourceIDT_BC.value.filter(item => item._2 == key).map{bcValues =>
-          (bcValues._1, key, value1, bcValues._3 + value2)
+          (bcValues._1, key, value1, bcValues._3("out") + value2)
         }
     }
 
     val distanceList = distanceListTemp.flatMap{
       case (source, sourceBorder, key, distance) =>
         targetIDT_BC.value.filter(item => item._2 == key).map{bcValues =>
-          (source, sourceBorder, key, bcValues._1, distance + bcValues._3)
+          (source, sourceBorder, key, bcValues._1, distance + bcValues._3("in"))
         }
     }
 
