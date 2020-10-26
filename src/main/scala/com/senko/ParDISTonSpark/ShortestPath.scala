@@ -27,12 +27,14 @@ object ShortestPath {
             ctx.sendToDst((ctx.srcAttr._2 + ctx.attr, ctx.srcAttr._3 :+ ctx.srcId)),
           (a, b) => (if (a._1 < b._1) a else b)
         )
+        if(newDistances.count() != 0) {
+          g2 = g2.outerJoinVertices(newDistances)((vid, vd, newSum) => {
+            val newSumVal: (Int, List[VertexId]) = newSum.getOrElse((Int.MaxValue, List[VertexId]()))
+            (vd._1 || vid == currentVertexId, math.min(vd._2, newSumVal._1),
+              if(vd._2 < newSumVal._1) vd._3 else newSumVal._2)
+          })
+        }
 
-        g2 = g2.outerJoinVertices(newDistances)((vid, vd, newSum) => {
-          val newSumVal: (Int, List[VertexId]) = newSum.getOrElse((Int.MaxValue, List[VertexId]()))
-          (vd._1 || vid == currentVertexId, math.min(vd._2, newSumVal._1),
-            if(vd._2 < newSumVal._1) vd._3 else newSumVal._2)
-        })
 
       }
     }
