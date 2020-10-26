@@ -24,6 +24,8 @@ object PrepProcessManager {
       println("----------")
       println(ex._1)
       ex._2.vertices.collect().foreach(println(_))
+      println(".......")
+      ex._2.edges.collect().foreach(println(_))
       println("----------")
     }
 
