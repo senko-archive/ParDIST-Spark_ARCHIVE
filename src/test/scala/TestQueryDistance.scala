@@ -4,16 +4,16 @@ import org.apache.spark.graphx.{Edge, Graph}
 
 object TestQueryDistance extends App{
 
-  val vertexN0 = (1L, Node("n0", false, "C1", None))
-  val vertexN1 = (2L, Node("n1", false, "C1", None))
-  val vertexN2 = (3L, Node("n2", true, "C1", None))
+  val vertexN0 = (1L, Node("n0", isBorderNode = false, "C1", None))
+  val vertexN1 = (2L, Node("n1", isBorderNode = false, "C1", None))
+  val vertexN2 = (3L, Node("n2", isBorderNode = true, "C1", None))
 
   val edge12 = Edge(1L, 2L,10)
   val edge13 = Edge(1L, 3L, 20)
 
-  val vertexN6 = (7L, Node("n6", true, "C2", None))
-  val vertexN7 = (8L, Node("n7", true, "C2", None))
-  val vertexN9 = (9L, Node("n9", false, "C2", None))
+  val vertexN6 = (7L, Node("n6", isBorderNode = true, "C2", None))
+  val vertexN7 = (8L, Node("n7", isBorderNode = true, "C2", None))
+  val vertexN9 = (9L, Node("n9", isBorderNode = false, "C2", None))
 
   val edge67 = Edge(7L, 8L, 4)
   val edge79 = Edge(8L, 9L, 5)
@@ -49,7 +49,7 @@ object TestQueryDistance extends App{
   println(result)
 
   val target = array.filter(element => element._1 == result).head
-  val secondResult = target._2.vertices.filter(vertex => (vertex._1 == 1L && vertex._2.partition == result)).count() > 0
+  val secondResult = target._2.vertices.filter(vertex => vertex._1 == 1L && vertex._2.partition == result).count() > 0
 
   println("........")
   println(secondResult)

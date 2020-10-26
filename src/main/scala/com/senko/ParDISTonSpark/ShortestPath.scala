@@ -25,7 +25,7 @@ object ShortestPath {
         val newDistances = g2.aggregateMessages[(Int, List[VertexId])](
           ctx => if (ctx.srcId == currentVertexId)
             ctx.sendToDst((ctx.srcAttr._2 + ctx.attr, ctx.srcAttr._3 :+ ctx.srcId)),
-          (a, b) => (if (a._1 < b._1) a else b)
+          (a, b) => if (a._1 < b._1) a else b
         )
         if(newDistances.count() != 0) {
           g2 = g2.outerJoinVertices(newDistances)((vid, vd, newSum) => {

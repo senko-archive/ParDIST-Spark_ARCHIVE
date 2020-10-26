@@ -2,7 +2,7 @@ package com.senko.ParDISTonSpark
 
 import java.util.concurrent.Executors
 
-import org.apache.log4j.LogManager
+import org.apache.log4j.{LogManager, Logger}
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Edge, EdgeTriplet, Graph, VertexId}
 import org.apache.spark.rdd.RDD
@@ -12,18 +12,18 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
 
 class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext, sc: SparkContext) {
-  val log = LogManager.getLogger(this.getClass)
+  val log: Logger = LogManager.getLogger(this.getClass)
   implicit val ec_inner: ExecutionContext = ec
-  val parallelWorkerNumber = parallel
+  val parallelWorkerNumber: Int = parallel
   val scinner: SparkContext = sc
 
-  def prepareExtendedComponents() = {
+  def prepareExtendedComponents(): (Array[(String, Graph[Node, Int])], Graph[VertexId, Int]) = {
 
     val partitions = GraphHelpers.getPartitions(graph)
     log.info(s"Graph have ${partitions.length} partitions")
     log.info(s"partitions are: ${partitions.mkString(" - ")}")
 
-    val futureResults = partitions.map(startCreateEC(_))
+    val futureResults = partitions.map(startCreateEC)
     val result = futureResults.map(elem => {
       Await.result(elem, Duration.Inf)
     })
@@ -54,13 +54,13 @@ class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext,
 
   }
 
-  def prepareComponentDistanceMatrix() = {
+  def prepareComponentDistanceMatrix(): ListBuffer[(String, String, ListBuffer[(VertexId, VertexId, Int)])] = {
     val partitions = GraphHelpers.getPartitions(graph)
     val CDM = new ListBuffer[(String, String, ListBuffer[(VertexId, VertexId, Int)])]
     val vertexList = new ListBuffer[(String, List[VertexId])]
 
     for(partition <- partitions) {
-      val vertices = graph.vertices.filter(vertex => vertex._2.partition == partition && vertex._2.isBorderNode == true).collect()
+      val vertices = graph.vertices.filter(vertex => vertex._2.partition == partition && vertex._2.isBorderNode).collect()
       vertexList.append((partition, vertices.map(vertex => vertex._1).toList))
     }
 
@@ -94,7 +94,7 @@ class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext,
 
   }
 
-  def startCreateEC(partitionName: String) = Future {
+  def startCreateEC(partitionName: String): Future[(String, Graph[Node, Int], ListBuffer[VertexId], ListBuffer[Edge[Int]])] = Future {
 
     log.info(s"thread started for partition: $partitionName with thread: ${Thread.currentThread().getName}")
 
@@ -156,7 +156,7 @@ class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext,
 
   }
 
-  def computeIDT(borderNodes: Array[(VertexId, String)], nonBorderNodes: Array[(VertexId, String)]) = {
+  def computeIDT(borderNodes: Array[(VertexId, String)], nonBorderNodes: Array[(VertexId, String)]): Map[VertexId, IDT] = {
     val IDT_mid_result = borderNodes.flatMap(borderNode => {
       nonBorderNodes.map(nonBorderNode => {
         log.debug(s"shortestpath is running for source: ${borderNode._1} and destination: ${nonBorderNode._1}")
@@ -186,7 +186,7 @@ class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext,
   returns edge couples in shortest path list
   if list is [A,D,E,F,C] then returns (A,D),(D,E)(E,F)...
    */
-  def getEdgeIndexCouples(borderToBorderShortest: ListBuffer[(VertexId, String, VertexId, String, List[VertexId])]) = {
+  def getEdgeIndexCouples(borderToBorderShortest: ListBuffer[(VertexId, String, VertexId, String, List[VertexId])]): ListBuffer[(VertexId, VertexId)] = {
     val edgeIndexCouples =new ListBuffer[(VertexId, VertexId)]()
     borderToBorderShortest.foreach(item => {
       val shortestPath = item._5
@@ -197,7 +197,7 @@ class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext,
     edgeIndexCouples
   }
 
-  def findVerticesToAddEC(borderToBorderShortest: ListBuffer[(VertexId, String, VertexId, String, List[VertexId])], extendedSubGraph: Graph[Node, Int]) = {
+  def findVerticesToAddEC(borderToBorderShortest: ListBuffer[(VertexId, String, VertexId, String, List[VertexId])], extendedSubGraph: Graph[Node, Int]): ListBuffer[(VertexId, Node)] = {
     val verticesToAdd = new ListBuffer[(VertexId, Node)]()
 
     borderToBorderShortest.foreach(item => {
@@ -213,13 +213,13 @@ class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext,
     verticesToAdd
   }
 
-  def findEdgesToAddEC(edgeIndexCouples: ListBuffer[(VertexId, VertexId)]) = {
+  def findEdgesToAddEC(edgeIndexCouples: ListBuffer[(VertexId, VertexId)]): ListBuffer[Edge[Int]] = {
     val edgesToAdd = new ListBuffer[Edge[Int]]
     edgeIndexCouples.foreach(item => {
       // IMPORTANT -> here if vertices are A D E I'm taking edge between A->D, D->A, D->E, E->D
       val toADD: Array[EdgeTriplet[Node, Int]] = graph.triplets.filter(triplet => (triplet.srcId == item._1 && triplet.dstId == item._2) || (triplet.srcId == item._2 && triplet.dstId == item._1)).collect()
       toADD.foreach(triplet => {
-        val edge = Edge(triplet.srcId.toLong, triplet.dstId.toLong, triplet.attr)
+        val edge = Edge(triplet.srcId, triplet.dstId, triplet.attr)
         edgesToAdd.append(edge)
       })
     })
@@ -227,7 +227,7 @@ class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext,
   }
 
   def createPartitionOfTransitNetwork(borderToBorderShortest: ListBuffer[(VertexId, String, VertexId, String, List[VertexId])],
-                                      edgesToAdd: ListBuffer[Edge[Int]]) = {
+                                      edgesToAdd: ListBuffer[Edge[Int]]): (ListBuffer[VertexId], ListBuffer[Edge[Int]]) = {
     // I can follow 2 different approch, one is create Gt in partitions as a list and hold information in driver
     // second is for each partition create small Gt Graph and at the end union them
     // for now I'm following first one.
@@ -247,7 +247,7 @@ class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext,
 
     allVertexIDs.foreach(vertexID => {
       val neighbour = graph.triplets.filter(triplet => {
-        triplet.srcId == vertexID && triplet.srcAttr.isBorderNode == true && triplet.srcAttr.partition != triplet.dstAttr.partition
+        triplet.srcId == vertexID && triplet.srcAttr.isBorderNode && triplet.srcAttr.partition != triplet.dstAttr.partition
       }).collect()
       neighbour.foreach(neig => allVertexIDsMutable.append(neig.dstId))
       neighbour.foreach(neig => transitNetworkEdges.append(Edge(neig.srcId, neig.dstId, neig.attr)))
@@ -263,7 +263,7 @@ class PreProcessor(graph: Graph[Node,Int], parallel: Int,  ec: ExecutionContext,
 
 object PreProcessor {
 
-  def apply(graph: Graph[Node,Int], paralel:Int, sc: SparkContext) = {
+  def apply(graph: Graph[Node,Int], paralel:Int, sc: SparkContext): PreProcessor = {
     val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(paralel, new CustomThreadFactory))
     new PreProcessor(graph, paralel, ec, sc)
   }

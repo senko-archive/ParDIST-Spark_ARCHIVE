@@ -1,38 +1,38 @@
 package com.senko.ParDISTonSpark
 
-import org.apache.log4j.LogManager
+import org.apache.log4j.{LogManager, Logger}
 import org.apache.spark.SparkContext
-import org.apache.spark.graphx.{Graph, Edge}
+import org.apache.spark.graphx.{Edge, Graph}
 
 object GraphGenerator {
 
-  var log = LogManager.getLogger(GraphGenerator.getClass)
+  var log: Logger = LogManager.getLogger(GraphGenerator.getClass)
 
-  def createParDistExampleGraph = {
-    val vertexN0 = (1L, Node("n0", false, "C1", None))
-    val vertexN1 = (2L, Node("n1", false, "C1", None))
-    val vertexN2 = (3L, Node("n2", true, "C1", None))
-    val vertexN3 = (4L, Node("n3", true, "C1", None))
-    val vertexN4 = (5L, Node("n4", true, "C1", None))
-    val vertexN5 = (6L, Node("n5", false, "C1", None))
+  def createParDistExampleGraph: (Seq[(Long, Node)], Seq[Edge[Int]]) = {
+    val vertexN0 = (1L, Node("n0", isBorderNode = false, "C1", None))
+    val vertexN1 = (2L, Node("n1", isBorderNode = false, "C1", None))
+    val vertexN2 = (3L, Node("n2", isBorderNode = true, "C1", None))
+    val vertexN3 = (4L, Node("n3", isBorderNode = true, "C1", None))
+    val vertexN4 = (5L, Node("n4", isBorderNode = true, "C1", None))
+    val vertexN5 = (6L, Node("n5", isBorderNode = false, "C1", None))
 
-    val vertexN6 = (7L, Node("n6", true, "C2", None))
-    val vertexN7 = (8L, Node("n7", true, "C2", None))
-    val vertexN9 = (9L, Node("n9", false, "C2", None))
-    val vertexN11 = (10L, Node("n11", false, "C2", None))
-    val vertexN12 = (11L, Node("n12", true, "C2", None))
+    val vertexN6 = (7L, Node("n6", isBorderNode = true, "C2", None))
+    val vertexN7 = (8L, Node("n7", isBorderNode = true, "C2", None))
+    val vertexN9 = (9L, Node("n9", isBorderNode = false, "C2", None))
+    val vertexN11 = (10L, Node("n11", isBorderNode = false, "C2", None))
+    val vertexN12 = (11L, Node("n12", isBorderNode = true, "C2", None))
 
-    val vertexN16 = (12L, Node("n16", true, "C3", None))
-    val vertexN20 = (13L, Node("n20", false, "C3", None))
-    val vertexN15 = (14L, Node("n15", false, "C3", None))
-    val vertexN19 = (15L, Node("n19", true, "C3", None))
-    val vertexN14 = (16L, Node("n14", false, "C3", None))
+    val vertexN16 = (12L, Node("n16", isBorderNode = true, "C3", None))
+    val vertexN20 = (13L, Node("n20", isBorderNode = false, "C3", None))
+    val vertexN15 = (14L, Node("n15", isBorderNode = false, "C3", None))
+    val vertexN19 = (15L, Node("n19", isBorderNode = true, "C3", None))
+    val vertexN14 = (16L, Node("n14", isBorderNode = false, "C3", None))
 
-    val vertexN18 = (17L, Node("n18", true, "C4", None))
-    val vertexN17 = (18L, Node("n17", false, "C4", None))
-    val vertexN13 = (19L, Node("n13", false, "C4", None))
-    val vertexN10 = (20L, Node("n10", false, "C4", None))
-    val vertexN8 = (21L, Node("n8", true, "C4", None))
+    val vertexN18 = (17L, Node("n18", isBorderNode = true, "C4", None))
+    val vertexN17 = (18L, Node("n17", isBorderNode = false, "C4", None))
+    val vertexN13 = (19L, Node("n13", isBorderNode = false, "C4", None))
+    val vertexN10 = (20L, Node("n10", isBorderNode = false, "C4", None))
+    val vertexN8 = (21L, Node("n8", isBorderNode = true, "C4", None))
 
     val seqOfVertices: Seq[(Long, Node)] = Seq(
       vertexN0, vertexN1, vertexN2, vertexN3, vertexN4, vertexN5, vertexN6,
@@ -87,12 +87,12 @@ object GraphGenerator {
 
   }
 
-  def createDirectedSampleGraph = {
-    val vertexA = (1L, Node("A", false, "C1", None))
-    val vertexB = (2L, Node("B", true, "C1", None))
-    val vertexC = (3L, Node("C", true, "C1", None))
-    val vertexD = (4L, Node("D", true, "C2", None))
-    val vertexE = (5L, Node("E", false, "C2", None))
+  def createDirectedSampleGraph: (Seq[(Long, Node)], Seq[Edge[Int]]) = {
+    val vertexA = (1L, Node("A", isBorderNode = false, "C1", None))
+    val vertexB = (2L, Node("B", isBorderNode = true, "C1", None))
+    val vertexC = (3L, Node("C", isBorderNode = true, "C1", None))
+    val vertexD = (4L, Node("D", isBorderNode = true, "C2", None))
+    val vertexE = (5L, Node("E", isBorderNode = false, "C2", None))
 
     val seqOfVertices = Seq(vertexA, vertexB, vertexC, vertexD, vertexE)
 
@@ -108,7 +108,7 @@ object GraphGenerator {
     (seqOfVertices, seqOfEdges)
   }
 
-  def createGraph(sc: SparkContext) = {
+  def createGraph(sc: SparkContext): Graph[Node, Int] = {
     log.info("Creating Graph... for ParDIST paper example")
 
     val (vertices, edges) = createParDistExampleGraph

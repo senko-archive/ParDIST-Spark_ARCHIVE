@@ -2,7 +2,7 @@ package com.senko.ParDISTonSpark
 
 import java.util.concurrent.Executors
 
-import org.apache.log4j.LogManager
+import org.apache.log4j.{LogManager, Logger}
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.{Graph, VertexId}
 import org.apache.spark.rdd.RDD
@@ -16,10 +16,10 @@ class QueryProcessor(extendedNetworkList: Array[(String, Graph[Node, Int])],
                      CDM: RDD[(String, String, ListBuffer[(VertexId, VertexId, Int)])],
                      sc: SparkContext,
                      ec: ExecutionContext) {
-  var log = LogManager.getLogger(this.getClass)
-  implicit val ec_inner = ec
+  var log: Logger = LogManager.getLogger(this.getClass)
+  implicit val ec_inner: ExecutionContext = ec
 
-  def queryDistance(source: VertexId, destination: VertexId) = {
+  def queryDistance(source: VertexId, destination: VertexId): Unit = {
 
     // find source partition.
     val sourcePartition = extendedNetworkList.filter(tuple2 => {
@@ -43,15 +43,15 @@ class QueryProcessor(extendedNetworkList: Array[(String, Graph[Node, Int])],
 
   }
 
-  def calculateDistanceSamePartition(extendedGraph: Graph[Node, Int], source: VertexId, destination: VertexId) = {
+  def calculateDistanceSamePartition(extendedGraph: Graph[Node, Int], source: VertexId, destination: VertexId): Int = {
     ShortestPath.singleSourceSingleTargetDijkstra(extendedGraph, source, destination)._2
   }
 
-  def getNodeFromExtendedGrapg(extendedGraph: Graph[Node, Int], vertexId: VertexId) = {
+  def getNodeFromExtendedGrapg(extendedGraph: Graph[Node, Int], vertexId: VertexId): (VertexId, Node) = {
     extendedGraph.vertices.filter(vertex => vertex._1 == vertexId).collect().head
   }
 
-  def calculateDistanceSourceBorderTargetBorder(sourceNode: (VertexId, Node), targetNode: (VertexId, Node)) = {
+  def calculateDistanceSourceBorderTargetBorder(sourceNode: (VertexId, Node), targetNode: (VertexId, Node)): Int = {
     val distance = CDM.filter(cmdEntry => {
       cmdEntry._1 == sourceNode._2.partition && cmdEntry._2 == targetNode._2.partition
     }).map(cmdEntry => {
@@ -62,9 +62,9 @@ class QueryProcessor(extendedNetworkList: Array[(String, Graph[Node, Int])],
     distance
   }
 
-  def calculateDistanceSourceTargetBorder(sourceNode: (VertexId, Node), targetNode: (VertexId, Node)) = {
+  def calculateDistanceSourceTargetBorder(sourceNode: (VertexId, Node), targetNode: (VertexId, Node)): Int = {
     // bu durumda sourceIDT yi broadcast yap ve CDM ile joinle bi sekilde
-    val readyforBC = (sourceNode._2.idt.get.borderIDTList.map(elem => (sourceNode._1, elem._1, elem._3)))
+    val readyforBC = sourceNode._2.idt.get.borderIDTList.map(elem => (sourceNode._1, elem._1, elem._3))
     val sourceIDT_BC = sc.broadcast(readyforBC)
 
     // CDM'in sadece source target  row'unu aldim.
@@ -100,7 +100,7 @@ class QueryProcessor(extendedNetworkList: Array[(String, Graph[Node, Int])],
     distanceResult
   }
 
-  def calculateDistanceSourceBorderTarget(sourceNode: (VertexId, Node), targetNode: (VertexId, Node)) = {
+  def calculateDistanceSourceBorderTarget(sourceNode: (VertexId, Node), targetNode: (VertexId, Node)): Int = {
     // bu durumda target tarafini broadcast yapicam.
     val readyforBC = targetNode._2.idt.get.borderIDTList.map(elem => (targetNode._1, elem._1, elem._3))
     val targetIDT_BC = sc.broadcast(readyforBC)
@@ -134,7 +134,7 @@ class QueryProcessor(extendedNetworkList: Array[(String, Graph[Node, Int])],
     distanceResult
   }
 
-  def calculateDistanceSourceTarget(sourceNode: (VertexId, Node), targetNode: (VertexId, Node)) = {
+  def calculateDistanceSourceTarget(sourceNode: (VertexId, Node), targetNode: (VertexId, Node)): Int = {
     val readyForSourceBC = sourceNode._2.idt.get.borderIDTList.map(elem => (sourceNode._1, elem._1, elem._3))
     val readyForTargetBC = targetNode._2.idt.get.borderIDTList.map(elem => (targetNode._1, elem._1, elem._3))
     val sourceIDT_BC = sc.broadcast(readyForSourceBC)
@@ -186,7 +186,7 @@ class QueryProcessor(extendedNetworkList: Array[(String, Graph[Node, Int])],
   def calculateDistanceDifferentPartition(sourceExtendedGraph: (String, Graph[Node, Int]),
                                           targetExtendedGraph: (String, Graph[Node, Int]),
                                           source: VertexId,
-                                          destination: VertexId) = {
+                                          destination: VertexId): Unit = {
 
     // get source and target nodes
     val sourceNode = getNodeFromExtendedGrapg(sourceExtendedGraph._2, source)
@@ -347,7 +347,7 @@ class QueryProcessor(extendedNetworkList: Array[(String, Graph[Node, Int])],
 
     }
 
-  def queryShortestPath(source: VertexId, destination: VertexId) = {
+  def queryShortestPath(source: VertexId, destination: VertexId): Unit = {
     // find source partitiion.
     val sourcePartition = extendedNetworkList.filter(tuple2 => {
       val found = tuple2._2.vertices.filter(vertex => vertex._1 == source).count() > 0
@@ -374,7 +374,7 @@ class QueryProcessor(extendedNetworkList: Array[(String, Graph[Node, Int])],
   def calculateShortestPathDifferentPartition(sourceExtendedGraph: (String, Graph[Node, Int]),
                                               targetExtendedGraph: (String, Graph[Node, Int]),
                                               source: VertexId,
-                                              destination: VertexId) = {
+                                              destination: VertexId): Unit = {
     // burda once distance calistirmamiz lazim false false olani ve path i alicam,
     // daha sonra bu path in 1. ve 2. elemanini na shortest sonra 2. ve 3. elemanina
     // son olarkata 3. ve 4. elemanina shortest cekicen sonra bu gelen pathleri bi concatliyacan
@@ -398,18 +398,18 @@ class QueryProcessor(extendedNetworkList: Array[(String, Graph[Node, Int])],
 
   }
 
-  def runPartialShortestPathinEC(graph: Graph[Node, Int], source: VertexId, destination: VertexId) = Future {
-    log.info(s"thread started for shortest path source: ${source} and destination ${destination}")
+  def runPartialShortestPathinEC(graph: Graph[Node, Int], source: VertexId, destination: VertexId): Future[(VertexId, Int, List[VertexId])] = Future {
+    log.info(s"thread started for shortest path source: $source and destination $destination")
     ShortestPath.singleSourceSingleTargetDijkstra(graph, source, destination)
   }
 
-  def runPartialShortestPathinT(graph: Graph[VertexId, Int], source: VertexId, destination: VertexId) = Future {
-    log.info(s"thread started for shortest path source: ${source} and destination ${destination}")
+  def runPartialShortestPathinT(graph: Graph[VertexId, Int], source: VertexId, destination: VertexId): Future[(VertexId, Int, List[VertexId])] = Future {
+    log.info(s"thread started for shortest path source: $source and destination $destination")
     ShortestPath.singleSourceSingleTargetDijkstra(graph, source, destination)
 
   }
 
-  def findPathToQuery(sourceNode: (VertexId, Node), targetNode: (VertexId, Node)) = {
+  def findPathToQuery(sourceNode: (VertexId, Node), targetNode: (VertexId, Node)): (VertexId, VertexId, VertexId, VertexId) = {
     val readyForSourceBC = sourceNode._2.idt.get.borderIDTList.map(elem => (sourceNode._1, elem._1, elem._3))
     val readyForTargetBC = targetNode._2.idt.get.borderIDTList.map(elem => (targetNode._1, elem._1, elem._3))
     val sourceIDT_BC = sc.broadcast(readyForSourceBC)
@@ -478,7 +478,7 @@ object QueryProcessor {
             transitNetwork:  Graph[VertexId, Int],
             CDM: RDD[(String, String, ListBuffer[(VertexId, VertexId, Int)])],
             sc: SparkContext,
-            paralel: Int = 3) = {
+            paralel: Int = 3): QueryProcessor = {
     val ec = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(paralel, new CustomThreadFactory))
     new QueryProcessor(extendedNetworkList, transitNetwork, CDM, sc, ec)
   }

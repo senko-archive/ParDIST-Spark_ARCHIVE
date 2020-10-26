@@ -1,23 +1,23 @@
 package com.senko.ParDISTonSpark
 
-import org.apache.log4j.LogManager
-import org.apache.spark.graphx.{Graph, VertexId}
+import org.apache.log4j.{LogManager, Logger}
+import org.apache.spark.graphx.{Graph, VertexId, VertexRDD}
 
 import scala.collection.mutable.ListBuffer
 
 object GraphHelpers {
 
-  var log = LogManager.getLogger(GraphHelpers.getClass)
+  var log: Logger = LogManager.getLogger(GraphHelpers.getClass)
 
-  def getPartitions(graph: Graph[Node, Int]) = {
+  def getPartitions(graph: Graph[Node, Int]): Array[String] = {
     graph.vertices.map(vertex => vertex._2.partition).distinct().collect()
   }
 
-  def getPartitionNodes(graph: Graph[Node, Int], partitionName: String) = {
+  def getPartitionNodes(graph: Graph[Node, Int], partitionName: String): VertexRDD[Node] = {
     graph.vertices.filter(vertex => vertex._2.partition == partitionName)
   }
 
-  def generateBorderCouples(borderList: Array[(VertexId, String)]) = {
+  def generateBorderCouples(borderList: Array[(VertexId, String)]): ListBuffer[((VertexId, String), (VertexId, String))] = {
 
     val borderListBuffer = new ListBuffer[((VertexId, String), (VertexId, String))]
     for(borderNodeA <- borderList) {
@@ -39,7 +39,7 @@ object GraphHelpers {
     borderListBuffer.filter(item => item._1 != item._2)
   }
 
-  def getPartitionGraph(graph: Graph[Node, Int], partition: String) = {
+  def getPartitionGraph(graph: Graph[Node, Int], partition: String): Graph[Node, Int] = {
     val extendedSubGraph = graph.subgraph(epred = triplet => {
       triplet.dstAttr.partition == partition && triplet.srcAttr.partition == partition
     },
